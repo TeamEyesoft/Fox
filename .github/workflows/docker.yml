@@ -30,10 +30,13 @@ jobs:
         uses: docker/metadata-action@v5.7.0
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=auto
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha,prefix=sha-,format=short
 
       - name: Set up Docker Buildx
