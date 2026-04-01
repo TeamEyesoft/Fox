@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Pre-commit hook: scan staged changes for secrets using gitleaks.
+# Install: bun run install-hooks
+
+if ! command -v gitleaks > /dev/null 2>&1; then
+  echo "gitleaks not found. Install it with: brew install gitleaks"
+  echo "Then re-run: bun run install-hooks"
+  exit 1
+fi
+
+gitleaks protect --staged --redact --no-banner

@@ -1,0 +1,7 @@
+node_modules/
+.git/
+fox.config.json
+fox.config.example.json
+README.md
+.github/
+src/__tests__/
