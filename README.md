@@ -13,11 +13,13 @@ Fox maps a set of configured GitLab projects to NPM packages. For each project i
 
 ## Web UI
 
-Fox includes a built-in web interface to browse available packages. Visit the registry URL in your browser to see all packages with their versions, descriptions, Unity compatibility info, and dependencies.
+Fox includes a built-in web interface to browse available packages and configure Unity Package Manager. Visit the registry URL in your browser to see all packages with their versions, descriptions, Unity compatibility info, and dependencies.
 
 - **Browse packages**: View all available packages in a clean, responsive interface
 - **Package details**: See Unity-specific metadata, dependencies, and version history
+- **Unity configuration generator**: Automatically generates the complete `scopedRegistries` configuration for your Unity project's `Packages/manifest.json`
 - **Copy install commands**: One-click copy of dependency entries for Unity's `manifest.json`
+- **Copy Unity config**: One-click copy of the entire registry configuration block
 - **Real-time updates**: Refresh button to fetch the latest packages from GitLab
 
 Access the UI at:

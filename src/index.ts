@@ -42,6 +42,13 @@ const app = new Elysia()
   .get("/", () => Bun.file("public/index.html"))
   .get("/ui", () => Bun.file("public/index.html"))
 
+  // Config endpoint for web UI
+  .get("/.well-known/config", () => ({
+    registry: {
+      baseUrl: config.registry.baseUrl,
+    },
+  }))
+
   // List all packages (Unity package discovery)
   .get("/-/all", async ({ set }) => {
     try {

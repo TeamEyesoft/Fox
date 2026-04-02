@@ -8,6 +8,12 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
     [v-cloak] { display: none; }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -35,6 +41,92 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex gap-8">
+        <!-- Sidebar -->
+        <div class="hidden lg:block w-80 flex-shrink-0">
+          <div class="sticky top-8">
+            <!-- Configure Unity Section -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div class="flex items-start">
+                <div class="flex-shrink-0">
+                  <svg class="h-4 w-4 text-blue-400 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div class="ml-2 flex-1 min-w-0">
+                  <h3 class="text-sm font-medium text-blue-900 mb-2">Configure Unity</h3>
+                  <p class="text-blue-700 mb-3 text-xs">Add this to your Unity project's <code class="bg-blue-100 px-1 py-0.5 rounded text-xs font-mono">manifest.json</code>:</p>
+
+                  <div class="bg-white border border-blue-300 rounded-md p-2 font-mono text-xs overflow-hidden">
+                    <div class="max-h-48 overflow-y-auto overflow-x-hidden">
+                      <pre class="text-gray-800 whitespace-pre-wrap break-all">{{ unityConfig }}</pre>
+                    </div>
+                  </div>
+
+                  <div class="mt-3">
+                    <button
+                      @click="copyUnityConfig"
+                      class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-medium transition-colors w-full mb-2">
+                      {{ copied ? 'Copied!' : 'Copy Config' }}
+                    </button>
+                    <div class="text-xs text-blue-600">
+                      <span class="font-medium">Registry:</span><br>
+                      <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-xs break-all">{{ registryUrl }}</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Package Statistics -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <h4 class="text-sm font-medium text-gray-900 mb-2">Statistics</h4>
+              <div class="space-y-1 text-xs text-gray-600">
+                <div class="flex justify-between">
+                  <span>Packages:</span>
+                  <span class="font-medium">{{ packages.length }}</span>
+                </div>
+                <div class="flex justify-between items-start">
+                  <span class="flex-shrink-0 mr-2">Status:</span>
+                  <span class="font-medium text-green-600" v-if="!loading && !error">Ready</span>
+                  <span class="font-medium text-yellow-600" v-else-if="loading">Loading</span>
+                  <span class="font-medium text-red-600" v-else>Error</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Unity Config Toggle -->
+        <div class="lg:hidden mb-6">
+          <button
+            @click="showMobileConfig = !showMobileConfig"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-between">
+            Configure Unity Package Manager
+            <svg class="h-4 w-4 transform transition-transform" :class="{ 'rotate-180': showMobileConfig }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div v-if="showMobileConfig" class="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p class="text-blue-700 mb-3 text-sm">Add this to your Unity project's <code class="bg-blue-100 px-1 py-0.5 rounded text-xs font-mono">manifest.json</code>:</p>
+
+            <div class="bg-white border border-blue-300 rounded-md p-3 font-mono text-xs overflow-hidden">
+              <div class="max-h-48 overflow-y-auto overflow-x-hidden">
+                <pre class="text-gray-800 whitespace-pre-wrap break-all">{{ unityConfig }}</pre>
+              </div>
+            </div>
+
+            <button
+              @click="copyUnityConfig"
+              class="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors w-full">
+              {{ copied ? 'Copied!' : 'Copy Config' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 min-w-0">
       <!-- Loading State -->
       <div v-if="loading && packages.length === 0" class="flex flex-col items-center justify-center py-16">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -66,7 +158,7 @@
       </div>
 
       <!-- Package Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div
           v-for="pkg in packages"
           :key="pkg.name"
@@ -156,6 +248,8 @@
           </div>
         </div>
       </div>
+        </div>
+      </div>
     </main>
 
     <!-- Toast Notification -->
@@ -168,7 +262,7 @@
   </div>
 
   <script>
-    const { createApp, ref, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
       setup() {
@@ -177,6 +271,40 @@
         const error = ref(null);
         const expandedPackages = ref(new Set());
         const showToast = ref(false);
+        const registryUrl = ref('');
+        const copied = ref(false);
+        const showMobileConfig = ref(false);
+
+        const unityConfig = computed(() => {
+          if (!registryUrl.value || packages.value.length === 0) return '';
+
+          const packageScopes = packages.value.map(pkg => `    "${pkg.name}"`).join(',\n');
+
+          return `{
+  "scopedRegistries": [
+    {
+      "name": "Fox Registry",
+      "url": "${registryUrl.value}",
+      "scopes": [ ... ]
+    }
+  ]
+}`;
+        });
+
+        const fetchConfig = async () => {
+          try {
+            const response = await fetch('/.well-known/config');
+            if (response.ok) {
+              const config = await response.json();
+              registryUrl.value = config.registry?.baseUrl || window.location.origin;
+            } else {
+              // Fallback to current origin if config endpoint doesn't exist
+              registryUrl.value = window.location.origin;
+            }
+          } catch (err) {
+            registryUrl.value = window.location.origin;
+          }
+        };
 
         const fetchPackages = async () => {
           loading.value = true;
@@ -220,6 +348,16 @@
           }
         };
 
+        const copyUnityConfig = async () => {
+          try {
+            await navigator.clipboard.writeText(unityConfig.value);
+            copied.value = true;
+            setTimeout(() => copied.value = false, 2000);
+          } catch (err) {
+            console.error('Failed to copy to clipboard:', err);
+          }
+        };
+
         const toggleVersions = (packageName) => {
           if (expandedPackages.value.has(packageName)) {
             expandedPackages.value.delete(packageName);
@@ -229,6 +367,7 @@
         };
 
         onMounted(() => {
+          fetchConfig();
           fetchPackages();
         });
 
@@ -238,9 +377,14 @@
           error,
           expandedPackages,
           showToast,
+          registryUrl,
+          unityConfig,
+          copied,
+          showMobileConfig,
           fetchPackages,
           formatDate,
           copyInstallCommand,
+          copyUnityConfig,
           toggleVersions
         };
       }
