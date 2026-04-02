@@ -19,7 +19,7 @@ export function parseTarballVersion(
   packageName: string,
   filename: string,
 ): string | null {
-  const prefix = packageName + "-";
+  const prefix = `${packageName}-`;
   if (!filename.startsWith(prefix) || !filename.endsWith(".tgz")) return null;
   const version = filename.slice(prefix.length, -".tgz".length);
   return version || null;

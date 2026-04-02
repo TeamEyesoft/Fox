@@ -11,6 +11,19 @@ Fox maps a set of configured GitLab projects to NPM packages. For each project i
 3. Responses are cached in memory for a configurable TTL to avoid hammering the GitLab API.
 4. Tarball downloads are proxied directly from GitLab release assets.
 
+## Web UI
+
+Fox includes a built-in web interface to browse available packages. Visit the registry URL in your browser to see all packages with their versions, descriptions, Unity compatibility info, and dependencies.
+
+- **Browse packages**: View all available packages in a clean, responsive interface
+- **Package details**: See Unity-specific metadata, dependencies, and version history
+- **Copy install commands**: One-click copy of dependency entries for Unity's `manifest.json`
+- **Real-time updates**: Refresh button to fetch the latest packages from GitLab
+
+Access the UI at:
+- `http://your-server:3000/` (root)
+- `http://your-server:3000/ui` (alternative path)
+
 ## Requirements
 
 - [Bun](https://bun.sh) 1.x
@@ -78,6 +91,44 @@ Start the development server with hot reload:
 ```bash
 bun run dev
 ```
+
+### Code formatting and linting
+
+This project uses [Biome.js](https://biomejs.dev) for fast formatting and linting:
+
+```bash
+# Format code
+bun run format
+
+# Check formatting without changes
+bun run format:check
+
+# Lint code
+bun run lint
+
+# Lint and auto-fix issues
+bun run lint:fix
+
+# Check both formatting and linting
+bun run check
+
+# Check and auto-fix everything
+bun run check:fix
+```
+
+### Pre-commit hooks
+
+Install the pre-commit hook to automatically check code quality and scan for secrets:
+
+```bash
+# Install gitleaks for secret scanning
+brew install gitleaks
+
+# Install the git hook
+bun run install-hooks
+```
+
+The hook runs biome checks and gitleaks on staged files before each commit.
 
 ## Docker
 

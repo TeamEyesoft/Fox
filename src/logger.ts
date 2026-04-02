@@ -2,7 +2,8 @@ type Level = "info" | "warn" | "error";
 
 function log(level: Level, msg: string, data?: Record<string, unknown>): void {
   process.stdout.write(
-    JSON.stringify({ ts: new Date().toISOString(), level, msg, ...data }) + "\n",
+    JSON.stringify({ ts: new Date().toISOString(), level, msg, ...data }) +
+      "\n",
   );
 }
 

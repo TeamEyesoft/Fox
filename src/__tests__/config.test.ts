@@ -1,7 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { join } from "path";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // loadConfig reads the filesystem, so we write real temp files per test.
 
@@ -27,7 +27,7 @@ function writeConfig(obj: unknown): string {
 
 async function loadConfig() {
   // Re-import fresh each time to avoid module cache issues
-  const mod = await import("../config?t=" + Date.now());
+  const mod = await import(`../config?t=${Date.now()}`);
   return mod.loadConfig();
 }
 

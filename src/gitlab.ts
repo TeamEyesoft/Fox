@@ -1,7 +1,7 @@
-import type { FoxConfig } from "./config";
 import type { Cache } from "./cache";
-import type { GitLabProject, GitLabRelease } from "./types";
+import type { FoxConfig } from "./config";
 import { logger } from "./logger";
+import type { GitLabProject, GitLabRelease } from "./types";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const RELEASES_PER_PAGE = 100;
@@ -48,9 +48,7 @@ export class GitLabClient {
     return this.cache.getOrSet(`gl:project:${id}`, async () => {
       const res = await this.rawFetch(this.apiUrl(`/projects/${encoded}`));
       if (!res.ok)
-        throw new Error(
-          `GitLab API ${res.status} fetching project ${id}`,
-        );
+        throw new Error(`GitLab API ${res.status} fetching project ${id}`);
       return res.json() as Promise<GitLabProject>;
     });
   }
@@ -63,7 +61,9 @@ export class GitLabClient {
     );
   }
 
-  private async fetchAllReleases(id: number | string): Promise<GitLabRelease[]> {
+  private async fetchAllReleases(
+    id: number | string,
+  ): Promise<GitLabRelease[]> {
     const encoded = encodeURIComponent(String(id));
     const all: GitLabRelease[] = [];
     let page = 1;
@@ -74,7 +74,9 @@ export class GitLabClient {
       );
       const res = await this.rawFetch(url);
       if (!res.ok)
-        throw new Error(`GitLab API ${res.status} fetching releases for project ${id}`);
+        throw new Error(
+          `GitLab API ${res.status} fetching releases for project ${id}`,
+        );
 
       const batch = (await res.json()) as GitLabRelease[];
       all.push(...batch);
@@ -95,9 +97,9 @@ export class GitLabClient {
       return await this.cache.getOrSet(
         cacheKey,
         async () => {
-          const url =
-            this.apiUrl(`/projects/${encoded}/repository/files/package.json/raw`) +
-            `?ref=${encodeURIComponent(ref)}`;
+          const url = `${this.apiUrl(
+            `/projects/${encoded}/repository/files/package.json/raw`,
+          )}?ref=${encodeURIComponent(ref)}`;
           const res = await this.rawFetch(url);
           if (!res.ok) return null;
           return res.json() as Promise<Record<string, unknown>>;
@@ -124,8 +126,9 @@ export class GitLabClient {
 
     const url =
       assetUrl ??
-      this.apiUrl(`/projects/${encodeURIComponent(String(id))}/repository/archive.tar.gz`) +
-        `?sha=${encodeURIComponent(tagName)}`;
+      `${this.apiUrl(
+        `/projects/${encodeURIComponent(String(id))}/repository/archive.tar.gz`,
+      )}?sha=${encodeURIComponent(tagName)}`;
 
     return this.rawFetch(url);
   }

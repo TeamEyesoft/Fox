@@ -1,9 +1,9 @@
 import { Elysia } from "elysia";
-import { loadConfig } from "./config";
 import { Cache } from "./cache";
+import { loadConfig } from "./config";
 import { GitLabClient } from "./gitlab";
-import { Registry } from "./registry";
 import { logger } from "./logger";
+import { Registry } from "./registry";
 import { parseTarballVersion } from "./utils";
 
 const config = loadConfig();
@@ -37,6 +37,10 @@ const app = new Elysia()
 
   // Health check
   .get("/healthz", () => ({ status: "ok" }))
+
+  // Web UI
+  .get("/", () => Bun.file("public/index.html"))
+  .get("/ui", () => Bun.file("public/index.html"))
 
   // List all packages (Unity package discovery)
   .get("/-/all", async ({ set }) => {

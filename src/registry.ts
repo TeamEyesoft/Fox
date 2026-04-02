@@ -1,10 +1,10 @@
 import type { FoxConfig, ProjectConfig } from "./config";
 import type { GitLabClient } from "./gitlab";
-import type { GitLabRelease, NpmPackument, NpmVersionManifest } from "./types";
-import { normalizeVersion, firstLine } from "./utils";
 import { logger } from "./logger";
+import type { GitLabRelease, NpmPackument, NpmVersionManifest } from "./types";
+import { firstLine, normalizeVersion } from "./utils";
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const _ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function findTgzAsset(release: GitLabRelease): string | undefined {
   return release.assets.links.find(
@@ -120,7 +120,10 @@ export class Registry {
     await Promise.all(
       releases.map(async (release) => {
         const version = normalizeVersion(release.tag_name);
-        const pkgJson = await this.gitlab.getPackageJson(proj.id, release.tag_name);
+        const pkgJson = await this.gitlab.getPackageJson(
+          proj.id,
+          release.tag_name,
+        );
         versions[version] = this.buildVersionManifest(name, release, pkgJson);
         time[version] = release.released_at ?? release.created_at;
       }),
@@ -158,7 +161,11 @@ export class Registry {
   async getTarballSource(
     name: string,
     version: string,
-  ): Promise<{ projectId: number | string; tagName: string; assetUrl?: string } | null> {
+  ): Promise<{
+    projectId: number | string;
+    tagName: string;
+    assetUrl?: string;
+  } | null> {
     await this.ensureInitialized();
     const proj = this.projectByName.get(name);
     if (!proj) return null;

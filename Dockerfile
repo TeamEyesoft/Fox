@@ -10,6 +10,7 @@ RUN bun install --frozen-lockfile --production
 FROM base
 COPY --from=deps /app/node_modules ./node_modules
 COPY src ./src
+COPY public ./public
 
 ENV FOX_CONFIG=/config/fox.config.json
 

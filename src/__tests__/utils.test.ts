@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeVersion, parseTarballVersion, firstLine } from "../utils";
+import { firstLine, normalizeVersion, parseTarballVersion } from "../utils";
 
 describe("normalizeVersion", () => {
   it("strips leading v", () => {
@@ -17,7 +17,9 @@ describe("normalizeVersion", () => {
 
 describe("parseTarballVersion", () => {
   it("extracts version from a standard filename", () => {
-    expect(parseTarballVersion("com.foo.bar", "com.foo.bar-1.2.3.tgz")).toBe("1.2.3");
+    expect(parseTarballVersion("com.foo.bar", "com.foo.bar-1.2.3.tgz")).toBe(
+      "1.2.3",
+    );
   });
 
   it("handles package names containing hyphens", () => {
@@ -27,11 +29,15 @@ describe("parseTarballVersion", () => {
   });
 
   it("returns null when the filename prefix doesn't match the package name", () => {
-    expect(parseTarballVersion("com.foo.bar", "com.other.bar-1.0.0.tgz")).toBeNull();
+    expect(
+      parseTarballVersion("com.foo.bar", "com.other.bar-1.0.0.tgz"),
+    ).toBeNull();
   });
 
   it("returns null when the extension is not .tgz", () => {
-    expect(parseTarballVersion("com.foo.bar", "com.foo.bar-1.0.0.tar.gz")).toBeNull();
+    expect(
+      parseTarballVersion("com.foo.bar", "com.foo.bar-1.0.0.tar.gz"),
+    ).toBeNull();
   });
 
   it("returns null for an empty version segment", () => {

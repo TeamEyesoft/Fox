@@ -1,11 +1,28 @@
 #!/usr/bin/env sh
-# Pre-commit hook: scan staged changes for secrets using gitleaks.
+# Pre-commit hook: run biome checks and scan for secrets using gitleaks.
 # Install: bun run install-hooks
 
+# Check if biome is available
+if ! command -v ./node_modules/.bin/biome > /dev/null 2>&1; then
+  echo "biome not found. Run: bun install"
+  exit 1
+fi
+
+# Check if gitleaks is available
 if ! command -v gitleaks > /dev/null 2>&1; then
   echo "gitleaks not found. Install it with: brew install gitleaks"
   echo "Then re-run: bun run install-hooks"
   exit 1
 fi
 
+echo "Running biome checks..."
+./node_modules/.bin/biome check --staged --no-errors-on-unmatched
+BIOME_EXIT_CODE=$?
+
+if [ $BIOME_EXIT_CODE -ne 0 ]; then
+  echo "biome checks failed. Fix the issues above or run: bun run check:fix"
+  exit $BIOME_EXIT_CODE
+fi
+
+echo "Running gitleaks..."
 gitleaks protect --staged --redact --no-banner

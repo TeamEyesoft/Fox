@@ -4,12 +4,19 @@
   "scripts": {
     "test": "bun test",
     "dev": "bun run --watch src/index.ts",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --fix .",
+    "check": "biome check .",
+    "check:fix": "biome check --fix .",
     "install-hooks": "cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo 'Pre-commit hook installed.'"
   },
   "dependencies": {
     "elysia": "latest"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
     "bun-types": "latest"
   },
   "module": "src/index.js"
