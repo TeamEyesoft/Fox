@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 
 export interface ProjectConfig {
   /** GitLab project ID (number) or path with namespace (e.g. "mygroup/myproject") */
@@ -26,7 +26,24 @@ export interface FoxConfig {
     maxCacheSize: number;
   };
   projects: ProjectConfig[];
+  /** Absolute path to an external JSON file containing the projects array. When set, `POST /-/reload` re-reads this file without restarting the server. */
+  projectsFile?: string;
   port: number;
+}
+
+export function readProjectsFile(filePath: string): ProjectConfig[] {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(filePath, "utf-8"));
+  } catch (err) {
+    throw new Error(
+      `Failed to load projects from ${filePath}: ${(err as Error).message}`,
+    );
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error(`Projects file ${filePath} must contain a JSON array.`);
+  }
+  return raw as ProjectConfig[];
 }
 
 export function loadConfig(): FoxConfig {
@@ -55,9 +72,19 @@ export function loadConfig(): FoxConfig {
     );
   }
 
-  const projects = Array.isArray(raw.projects)
-    ? (raw.projects as ProjectConfig[])
-    : [];
+  // Resolve optional external projects file
+  let projectsFile: string | undefined;
+  if (typeof raw.projectsFile === "string") {
+    projectsFile = isAbsolute(raw.projectsFile)
+      ? raw.projectsFile
+      : join(dirname(configPath), raw.projectsFile);
+  }
+
+  const projects = projectsFile
+    ? readProjectsFile(projectsFile)
+    : Array.isArray(raw.projects)
+      ? (raw.projects as ProjectConfig[])
+      : [];
 
   if (projects.length === 0) {
     throw new Error(
@@ -102,6 +129,7 @@ export function loadConfig(): FoxConfig {
           : 1000,
     },
     projects,
+    projectsFile,
     port: typeof raw.port === "number" ? raw.port : 3000,
   };
 }

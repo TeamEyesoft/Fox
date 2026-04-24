@@ -46,8 +46,21 @@ const app = new Elysia()
   .get("/.well-known/config", () => ({
     registry: {
       baseUrl: config.registry.baseUrl,
+      reloadSupported: !!config.projectsFile,
     },
   }))
+
+  // Reload projects from external file (no-op if projectsFile is not configured)
+  .post("/-/reload", async ({ set }) => {
+    try {
+      const result = await registry.reload();
+      logger.info("Registry reloaded via API", result);
+      return result;
+    } catch (err) {
+      set.status = 500;
+      return { error: (err as Error).message };
+    }
+  })
 
   // List all packages (Unity package discovery)
   .get("/-/all", async ({ set }) => {
@@ -110,7 +123,7 @@ const app = new Elysia()
       const upstream = await gitlab.proxyTarball(
         source.projectId,
         source.tagName,
-        source.assetUrl,
+        source.version,
       );
 
       if (!upstream.ok) {
@@ -120,11 +133,16 @@ const app = new Elysia()
         };
       }
 
-      // Buffer the body so we can compute the integrity hash
+      // Buffer the body so we can compute integrity (SHA-512) and shasum (SHA-1)
       const buffer = await upstream.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest("SHA-512", buffer);
-      const integrity = `sha512-${Buffer.from(hashBuffer).toString("base64")}`;
+      const [sha512Buffer, sha1Buffer] = await Promise.all([
+        crypto.subtle.digest("SHA-512", buffer),
+        crypto.subtle.digest("SHA-1", buffer),
+      ]);
+      const integrity = `sha512-${Buffer.from(sha512Buffer).toString("base64")}`;
+      const shasum = Buffer.from(sha1Buffer).toString("hex");
       registry.setIntegrity(params.name, version, integrity);
+      registry.setShasum(params.name, version, shasum);
 
       return new Response(buffer, {
         headers: {

@@ -1,7 +1,8 @@
 import type { Cache } from "./cache";
 import type { FoxConfig } from "./config";
 import { logger } from "./logger";
-import type { GitLabProject, GitLabRelease } from "./types";
+import { repackSourceArchive } from "./repack";
+import type { GitLabProject, GitLabRelease, GitLabTag } from "./types";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const RELEASES_PER_PAGE = 100;
@@ -61,6 +62,26 @@ export class GitLabClient {
     );
   }
 
+  getTags(id: number | string): Promise<GitLabTag[]> {
+    return this.cache.getOrSet(
+      `gl:tags:${id}`,
+      async () => {
+        const encoded = encodeURIComponent(String(id));
+        const res = await this.rawFetch(
+          this.apiUrl(
+            `/projects/${encoded}/repository/tags?per_page=100&order_by=version&sort=desc`,
+          ),
+        );
+        if (!res.ok)
+          throw new Error(
+            `GitLab API ${res.status} fetching tags for project ${id}`,
+          );
+        return res.json() as Promise<GitLabTag[]>;
+      },
+      this.config.registry.ttlSeconds * 1000,
+    );
+  }
+
   private async fetchAllReleases(
     id: number | string,
   ): Promise<GitLabRelease[]> {
@@ -114,22 +135,30 @@ export class GitLabClient {
   async proxyTarball(
     id: number | string,
     tagName: string,
-    assetUrl?: string,
+    version: string,
   ): Promise<Response> {
-    if (!assetUrl) {
-      logger.warn(
-        "No .tgz release asset found, falling back to source archive. " +
-          "Unity Package Manager may reject this — upload a structured .tgz release asset to fix it.",
-        { projectId: id, tag: tagName },
-      );
-    }
+    // Always use the source archive so the tarball is always at the exact
+    // tagged commit. We also patch package.json to the registry version because
+    // developers sometimes commit a future version number before tagging.
+    const url = `${this.apiUrl(
+      `/projects/${encodeURIComponent(String(id))}/repository/archive.tar.gz`,
+    )}?sha=${encodeURIComponent(tagName)}`;
 
-    const url =
-      assetUrl ??
-      `${this.apiUrl(
-        `/projects/${encodeURIComponent(String(id))}/repository/archive.tar.gz`,
-      )}?sha=${encodeURIComponent(tagName)}`;
+    const upstream = await this.rawFetch(url);
+    if (!upstream.ok) return upstream;
 
-    return this.rawFetch(url);
+    logger.info("Repackaging source archive for Unity compatibility", {
+      projectId: id,
+      tag: tagName,
+    });
+
+    const repackaged = await repackSourceArchive(
+      Buffer.from(await upstream.arrayBuffer()),
+      version,
+    );
+
+    return new Response(repackaged, {
+      headers: { "Content-Type": "application/octet-stream" },
+    });
   }
 }

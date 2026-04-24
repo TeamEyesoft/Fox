@@ -1,6 +1,7 @@
 export interface NpmVersionManifest {
   name: string;
   version: string;
+  _id?: string;
   description?: string;
   unity?: string;
   unityRelease?: string;
@@ -10,14 +11,25 @@ export interface NpmVersionManifest {
     shasum?: string;
     integrity?: string;
   };
+  // Allow extra package.json fields (displayName, keywords, author, license…)
+  // so Unity Package Manager receives the same metadata it expects.
+  [key: string]: unknown;
 }
 
 export interface NpmPackument {
   name: string;
+  displayName?: string;
   description?: string;
-  "dist-tags": { latest: string; [tag: string]: string };
+  "dist-tags": { latest?: string; [tag: string]: string | undefined };
   versions: Record<string, NpmVersionManifest>;
   time?: Record<string, string>;
+  _fox?: { source: "releases" | "tags"; projectUrl?: string };
+}
+
+export interface GitLabTag {
+  name: string;
+  message: string | null;
+  commit: { created_at: string };
 }
 
 export interface GitLabProject {

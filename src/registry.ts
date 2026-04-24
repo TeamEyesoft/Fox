@@ -1,15 +1,24 @@
 import type { FoxConfig, ProjectConfig } from "./config";
+import { readProjectsFile } from "./config";
 import type { GitLabClient } from "./gitlab";
 import { logger } from "./logger";
-import type { GitLabRelease, NpmPackument, NpmVersionManifest } from "./types";
+import type {
+  GitLabRelease,
+  GitLabTag,
+  NpmPackument,
+  NpmVersionManifest,
+} from "./types";
 import { firstLine, normalizeVersion } from "./utils";
 
-const _ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-function findTgzAsset(release: GitLabRelease): string | undefined {
-  return release.assets.links.find(
-    (l) => l.name.endsWith(".tgz") || l.link_type === "package",
-  )?.url;
+function tagToRelease(tag: GitLabTag): GitLabRelease {
+  return {
+    tag_name: tag.name,
+    name: tag.name,
+    description: tag.message ?? "",
+    created_at: tag.commit.created_at,
+    released_at: tag.commit.created_at,
+    assets: { links: [], sources: [] },
+  };
 }
 
 export class Registry {
@@ -18,11 +27,32 @@ export class Registry {
   private initPromise: Promise<void> | null = null;
   /** Lazily computed tarball integrity hashes: "name@version" → "sha512-<base64>" */
   private integrityStore = new Map<string, string>();
+  /** Lazily computed tarball SHA-1 shasums: "name@version" → hex string */
+  private shasumStore = new Map<string, string>();
+  private projects: ProjectConfig[];
 
   constructor(
     private config: FoxConfig,
     private gitlab: GitLabClient,
-  ) {}
+  ) {
+    this.projects = [...config.projects];
+  }
+
+  /** Re-reads the projects file (if configured) and rebuilds the package name map. */
+  async reload(): Promise<{ count: number; names: string[] }> {
+    if (this.config.projectsFile) {
+      this.projects = readProjectsFile(this.config.projectsFile);
+      logger.info("Reloaded projects from file", {
+        file: this.config.projectsFile,
+        count: this.projects.length,
+      });
+    }
+    this.projectByName.clear();
+    this.initPromise = null;
+    await this.ensureInitialized();
+    const names = Array.from(this.projectByName.keys());
+    return { count: names.length, names };
+  }
 
   private ensureInitialized(): Promise<void> {
     if (!this.initPromise) {
@@ -37,9 +67,16 @@ export class Registry {
 
   private async buildNameMap(): Promise<void> {
     await Promise.all(
-      this.config.projects.map(async (proj) => {
+      this.projects.map(async (proj) => {
         try {
           const name = await this.resolvePackageName(proj);
+          const existing = this.projectByName.get(name);
+          if (existing) {
+            logger.warn(
+              "Package name collision: two projects share the same name — the second will shadow the first. Use nameOverride to fix this.",
+              { name, firstId: existing.id, secondId: proj.id },
+            );
+          }
           this.projectByName.set(name, proj);
         } catch (err) {
           logger.error("Failed to resolve package name, skipping project", {
@@ -48,6 +85,11 @@ export class Registry {
           });
         }
       }),
+    );
+
+    logger.info(
+      `Resolved ${this.projectByName.size} of ${this.projects.length} configured projects`,
+      { names: Array.from(this.projectByName.keys()) },
     );
 
     if (this.projectByName.size === 0) {
@@ -75,26 +117,25 @@ export class Registry {
     const version = normalizeVersion(release.tag_name);
     const tarball = `${this.config.registry.baseUrl}/${name}/-/${name}-${version}.tgz`;
     const integrity = this.integrityStore.get(`${name}@${version}`);
+    const shasum = this.shasumStore.get(`${name}@${version}`);
 
     return {
+      // Pass through all package.json fields (displayName, keywords, author…)
+      // so Unity Package Manager receives the same metadata as from a direct install.
+      ...(pkgJson ?? {}),
+      // Override registry-authoritative fields.
       name,
       version,
+      _id: `${name}@${version}`,
       description:
         typeof pkgJson?.description === "string"
           ? pkgJson.description
           : firstLine(release.description),
-      unity: typeof pkgJson?.unity === "string" ? pkgJson.unity : undefined,
-      unityRelease:
-        typeof pkgJson?.unityRelease === "string"
-          ? pkgJson.unityRelease
-          : undefined,
-      dependencies:
-        pkgJson?.dependencies != null &&
-        typeof pkgJson.dependencies === "object" &&
-        !Array.isArray(pkgJson.dependencies)
-          ? (pkgJson.dependencies as Record<string, string>)
-          : undefined,
-      dist: { tarball, ...(integrity ? { integrity } : {}) },
+      dist: {
+        tarball,
+        ...(shasum ? { shasum } : {}),
+        ...(integrity ? { integrity } : {}),
+      },
     };
   }
 
@@ -106,13 +147,41 @@ export class Registry {
     return this.integrityStore.get(`${name}@${version}`);
   }
 
+  setShasum(name: string, version: string, shasum: string): void {
+    this.shasumStore.set(`${name}@${version}`, shasum);
+  }
+
+  getShasum(name: string, version: string): string | undefined {
+    return this.shasumStore.get(`${name}@${version}`);
+  }
+
+  private async getEffectiveReleases(
+    id: number | string,
+    name: string,
+  ): Promise<{ releases: GitLabRelease[]; source: "releases" | "tags" }> {
+    const releases = await this.gitlab.getReleases(id);
+    if (releases.length > 0) return { releases, source: "releases" };
+
+    const tags = await this.gitlab.getTags(id);
+    if (tags.length === 0) return { releases: [], source: "releases" };
+    logger.info("No releases found, falling back to git tags", {
+      package: name,
+      tags: tags.length,
+    });
+    return { releases: tags.map(tagToRelease), source: "tags" };
+  }
+
   async getPackument(name: string): Promise<NpmPackument | null> {
     await this.ensureInitialized();
     const proj = this.projectByName.get(name);
     if (!proj) return null;
 
-    const releases = await this.gitlab.getReleases(proj.id);
+    const [{ releases, source }, project] = await Promise.all([
+      this.getEffectiveReleases(proj.id, name),
+      this.gitlab.getProject(proj.id),
+    ]);
     if (releases.length === 0) return null;
+    const projectUrl = `${this.config.gitlab.baseUrl}/${project.path_with_namespace}`;
 
     const versions: Record<string, NpmVersionManifest> = {};
     const time: Record<string, string> = {};
@@ -130,13 +199,23 @@ export class Registry {
     );
 
     const latest = normalizeVersion(releases[0].tag_name);
+    const latestManifest = versions[latest];
 
     return {
       name,
-      description: firstLine(releases[0].description),
+      // displayName comes from package.json (stable across versions)
+      displayName:
+        typeof latestManifest?.displayName === "string"
+          ? latestManifest.displayName
+          : undefined,
+      description:
+        typeof latestManifest?.description === "string"
+          ? latestManifest.description
+          : undefined,
       "dist-tags": { latest },
       versions,
       time,
+      _fox: { source, projectUrl },
     };
   }
 
@@ -148,7 +227,7 @@ export class Registry {
     const proj = this.projectByName.get(name);
     if (!proj) return null;
 
-    const releases = await this.gitlab.getReleases(proj.id);
+    const { releases } = await this.getEffectiveReleases(proj.id, name);
     const release = releases.find(
       (r) => normalizeVersion(r.tag_name) === version,
     );
@@ -164,23 +243,19 @@ export class Registry {
   ): Promise<{
     projectId: number | string;
     tagName: string;
-    assetUrl?: string;
+    version: string;
   } | null> {
     await this.ensureInitialized();
     const proj = this.projectByName.get(name);
     if (!proj) return null;
 
-    const releases = await this.gitlab.getReleases(proj.id);
+    const { releases } = await this.getEffectiveReleases(proj.id, name);
     const release = releases.find(
       (r) => normalizeVersion(r.tag_name) === version,
     );
     if (!release) return null;
 
-    return {
-      projectId: proj.id,
-      tagName: release.tag_name,
-      assetUrl: findTgzAsset(release),
-    };
+    return { projectId: proj.id, tagName: release.tag_name, version };
   }
 
   async getAllPackuments(): Promise<Record<string, NpmPackument>> {
@@ -189,8 +264,16 @@ export class Registry {
 
     await Promise.all(
       Array.from(this.projectByName.keys()).map(async (name) => {
-        const packument = await this.getPackument(name);
-        if (packument) result[name] = packument;
+        try {
+          const packument = await this.getPackument(name);
+          result[name] = packument ?? { name, "dist-tags": {}, versions: {} };
+        } catch (err) {
+          logger.warn("Failed to fetch packument, including stub", {
+            name,
+            error: (err as Error).message,
+          });
+          result[name] = { name, "dist-tags": {}, versions: {} };
+        }
       }),
     );
 

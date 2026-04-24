@@ -42,3 +42,6 @@ package-lock.json
 **/*.bun
 
 fox.config.json
+fox.projects.json
+.claude
+CLAUDE.md

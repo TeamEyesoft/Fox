@@ -17,9 +17,11 @@ Fox includes a built-in web interface to browse available packages and configure
 
 - **Browse packages**: View all available packages in a clean, responsive interface
 - **Package details**: See Unity-specific metadata, dependencies, and version history
+- **GitLab links**: Each package card has a direct link to the source project on GitLab
 - **Unity configuration generator**: Automatically generates the complete `scopedRegistries` configuration for your Unity project's `Packages/manifest.json`
 - **Copy install commands**: One-click copy of dependency entries for Unity's `manifest.json`
 - **Copy Unity config**: One-click copy of the entire registry configuration block
+- **Dark/light theme**: Toggle between themes; preference is remembered in the browser
 - **Real-time updates**: Refresh button to fetch the latest packages from GitLab
 
 Access the UI at:
@@ -74,11 +76,12 @@ Fox resolves the NPM package name for each project in this order:
 2. The `name` field in the project's root `package.json` (standard for Unity packages)
 3. The GitLab project path as a fallback
 
-### Tarball assets
+### Tarball repackaging
 
-Fox looks for a `.tgz` release asset link in each GitLab release. For Unity Package Manager compatibility the tarball must be structured with a `package/` root directory — this is the standard output of `npm pack` run inside a Unity package folder.
+Fox always downloads the GitLab source archive for the tagged commit and repackages it on the fly into an NPM-compatible tarball. The repackager:
 
-If no `.tgz` asset is found Fox falls back to the GitLab source archive, but **Unity will likely reject it** because the archive root is the project folder, not `package/`. Upload a correctly structured `.tgz` as a release asset to avoid this.
+- Renames the archive root directory to `package/` (required by npm/Unity)
+- Patches the `version` field inside `package/package.json` to match the registry version, preventing mismatches when a developer commits a future version number before tagging
 
 ## Development
 
