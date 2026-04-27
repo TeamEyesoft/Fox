@@ -2,7 +2,7 @@ import type { Cache } from "./cache";
 import type { FoxConfig } from "./config";
 import { logger } from "./logger";
 import { repackSourceArchive } from "./repack";
-import type { GitLabProject, GitLabRelease, GitLabTag } from "./types";
+import type { GitLabProject, GitLabRelease } from "./types";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const RELEASES_PER_PAGE = 100;
@@ -58,26 +58,6 @@ export class GitLabClient {
     return this.cache.getOrSet(
       `gl:releases:${id}`,
       () => this.fetchAllReleases(id),
-      this.config.registry.ttlSeconds * 1000,
-    );
-  }
-
-  getTags(id: number | string): Promise<GitLabTag[]> {
-    return this.cache.getOrSet(
-      `gl:tags:${id}`,
-      async () => {
-        const encoded = encodeURIComponent(String(id));
-        const res = await this.rawFetch(
-          this.apiUrl(
-            `/projects/${encoded}/repository/tags?per_page=100&order_by=version&sort=desc`,
-          ),
-        );
-        if (!res.ok)
-          throw new Error(
-            `GitLab API ${res.status} fetching tags for project ${id}`,
-          );
-        return res.json() as Promise<GitLabTag[]>;
-      },
       this.config.registry.ttlSeconds * 1000,
     );
   }

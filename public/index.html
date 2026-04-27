@@ -21,6 +21,7 @@
     .line-clamp-2 {
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -209,11 +210,11 @@
                     </div>
                     <p class="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate mt-0.5">{{ pkg.name }}</p>
                   </div>
-                  <span v-if="pkg._fox?.source === 'tags'"
-                    class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                    title="Served from git tags">Tags</span>
-                  <span v-else
-                    class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                  <span v-if="pkg._fox?.unreleased"
+                    class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                    Unreleased
+                  </span>
+                  <span v-else class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
                     Unity
                   </span>
                 </div>
@@ -234,8 +235,8 @@
                 <!-- Spacer -->
                 <div class="flex-1"></div>
 
-                <!-- Metadata -->
-                <div class="space-y-1">
+                <!-- Metadata (released packages only) -->
+                <div v-else class="space-y-1">
                   <div v-if="pkg.unity" class="text-xs text-gray-500 dark:text-gray-400">
                     Unity {{ pkg.unity }}{{ pkg.unityRelease ? ' · ' + pkg.unityRelease : '' }}
                   </div>
@@ -252,22 +253,30 @@
               <!-- Action bar -->
               <div class="border-t border-gray-100 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-700/40 rounded-b-lg flex-shrink-0">
                 <div class="flex items-center justify-between">
-                  <button
-                    @click="copyInstallCommand(pkg.name)"
-                    class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors">
-                    Copier
-                  </button>
-                  <div class="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                    <span class="font-mono">v{{ pkg.latest }}</span>
-                    <span v-if="pkg.time && pkg.time[pkg.latest]">
-                      · {{ formatDate(pkg.time[pkg.latest]) }}
-                    </span>
+                  <template v-if="!pkg._fox?.unreleased">
                     <button
-                      @click="openVersions(pkg)"
-                      class="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
-                      {{ Object.keys(pkg.versions).length }} version{{ Object.keys(pkg.versions).length !== 1 ? 's' : '' }}
+                      @click="copyInstallCommand(pkg.name)"
+                      class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors">
+                      Copier
                     </button>
-                  </div>
+                    <div class="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                      <span class="font-mono">v{{ pkg.latest }}</span>
+                      <span v-if="pkg.time && pkg.time[pkg.latest]">
+                        · {{ formatDate(pkg.time[pkg.latest]) }}
+                      </span>
+                      <button
+                        @click="openVersions(pkg)"
+                        class="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
+                        {{ Object.keys(pkg.versions).length }} version{{ Object.keys(pkg.versions).length !== 1 ? 's' : '' }}
+                      </button>
+                    </div>
+                  </template>
+                  <span v-else class="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                    <svg class="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    No release published yet
+                  </span>
                 </div>
               </div>
             </div>
@@ -444,10 +453,9 @@ ${scopes}
             const response = await fetch('/-/all');
             if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             const data = await response.json();
-            packages.value = Object.values(data).map(pkg => ({
-              ...pkg,
-              latest: pkg['dist-tags']?.latest || 'unknown'
-            }));
+            packages.value = Object.values(data)
+              .map(pkg => ({ ...pkg, latest: pkg['dist-tags']?.latest || 'unknown' }))
+              .sort((a, b) => a.name.localeCompare(b.name));
           } catch (err) {
             error.value = err.message;
           } finally {

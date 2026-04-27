@@ -23,14 +23,9 @@ export interface NpmPackument {
   "dist-tags": { latest?: string; [tag: string]: string | undefined };
   versions: Record<string, NpmVersionManifest>;
   time?: Record<string, string>;
-  _fox?: { source: "releases" | "tags"; projectUrl?: string };
+  _fox?: { projectUrl?: string; unreleased?: boolean };
 }
 
-export interface GitLabTag {
-  name: string;
-  message: string | null;
-  commit: { created_at: string };
-}
 
 export interface GitLabProject {
   id: number;

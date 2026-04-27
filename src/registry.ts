@@ -4,22 +4,11 @@ import type { GitLabClient } from "./gitlab";
 import { logger } from "./logger";
 import type {
   GitLabRelease,
-  GitLabTag,
   NpmPackument,
   NpmVersionManifest,
 } from "./types";
 import { firstLine, normalizeVersion } from "./utils";
 
-function tagToRelease(tag: GitLabTag): GitLabRelease {
-  return {
-    tag_name: tag.name,
-    name: tag.name,
-    description: tag.message ?? "",
-    created_at: tag.commit.created_at,
-    released_at: tag.commit.created_at,
-    assets: { links: [], sources: [] },
-  };
-}
 
 export class Registry {
   /** package name → project config */
@@ -155,20 +144,8 @@ export class Registry {
     return this.shasumStore.get(`${name}@${version}`);
   }
 
-  private async getEffectiveReleases(
-    id: number | string,
-    name: string,
-  ): Promise<{ releases: GitLabRelease[]; source: "releases" | "tags" }> {
-    const releases = await this.gitlab.getReleases(id);
-    if (releases.length > 0) return { releases, source: "releases" };
-
-    const tags = await this.gitlab.getTags(id);
-    if (tags.length === 0) return { releases: [], source: "releases" };
-    logger.info("No releases found, falling back to git tags", {
-      package: name,
-      tags: tags.length,
-    });
-    return { releases: tags.map(tagToRelease), source: "tags" };
+  private getReleases(id: number | string): Promise<GitLabRelease[]> {
+    return this.gitlab.getReleases(id);
   }
 
   async getPackument(name: string): Promise<NpmPackument | null> {
@@ -176,12 +153,29 @@ export class Registry {
     const proj = this.projectByName.get(name);
     if (!proj) return null;
 
-    const [{ releases, source }, project] = await Promise.all([
-      this.getEffectiveReleases(proj.id, name),
+    const [releases, project] = await Promise.all([
+      this.getReleases(proj.id),
       this.gitlab.getProject(proj.id),
     ]);
-    if (releases.length === 0) return null;
     const projectUrl = `${this.config.gitlab.baseUrl}/${project.path_with_namespace}`;
+
+    if (releases.length === 0) {
+      const pkgJson = await this.gitlab.getPackageJson(proj.id, "HEAD");
+      return {
+        name,
+        displayName:
+          typeof pkgJson?.displayName === "string"
+            ? pkgJson.displayName
+            : undefined,
+        description:
+          typeof pkgJson?.description === "string"
+            ? pkgJson.description
+            : undefined,
+        "dist-tags": {},
+        versions: {},
+        _fox: { projectUrl, unreleased: true },
+      };
+    }
 
     const versions: Record<string, NpmVersionManifest> = {};
     const time: Record<string, string> = {};
@@ -215,7 +209,7 @@ export class Registry {
       "dist-tags": { latest },
       versions,
       time,
-      _fox: { source, projectUrl },
+      _fox: { projectUrl },
     };
   }
 
@@ -227,7 +221,7 @@ export class Registry {
     const proj = this.projectByName.get(name);
     if (!proj) return null;
 
-    const { releases } = await this.getEffectiveReleases(proj.id, name);
+    const releases = await this.getReleases(proj.id);
     const release = releases.find(
       (r) => normalizeVersion(r.tag_name) === version,
     );
@@ -249,7 +243,7 @@ export class Registry {
     const proj = this.projectByName.get(name);
     if (!proj) return null;
 
-    const { releases } = await this.getEffectiveReleases(proj.id, name);
+    const releases = await this.getReleases(proj.id);
     const release = releases.find(
       (r) => normalizeVersion(r.tag_name) === version,
     );
