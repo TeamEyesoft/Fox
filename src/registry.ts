@@ -2,13 +2,8 @@ import type { FoxConfig, ProjectConfig } from "./config";
 import { readProjectsFile } from "./config";
 import type { GitLabClient } from "./gitlab";
 import { logger } from "./logger";
-import type {
-  GitLabRelease,
-  NpmPackument,
-  NpmVersionManifest,
-} from "./types";
+import type { GitLabRelease, NpmPackument, NpmVersionManifest } from "./types";
 import { firstLine, normalizeVersion } from "./utils";
-
 
 export class Registry {
   /** package name → project config */

@@ -26,7 +26,6 @@ export interface NpmPackument {
   _fox?: { projectUrl?: string; unreleased?: boolean };
 }
 
-
 export interface GitLabProject {
   id: number;
   name: string;
