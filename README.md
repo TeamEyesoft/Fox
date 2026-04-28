@@ -7,9 +7,10 @@ Fox maps a set of configured GitLab projects to NPM packages. For each project i
 ## How it works
 
 1. At startup Fox reads your `fox.config.json` and resolves each project's package name from its root `package.json` (the standard Unity package manifest).
-2. When Unity queries the registry, Fox fetches the project's releases from GitLab and builds NPM-compatible package manifests on the fly.
+2. When Unity queries the registry, Fox fetches the project's GitLab releases and builds NPM-compatible package manifests on the fly.
 3. Responses are cached in memory for a configurable TTL to avoid hammering the GitLab API.
-4. Tarball downloads are proxied directly from GitLab release assets.
+4. Tarball downloads are served from the GitLab source archive for the tagged commit, repackaged on the fly for Unity compatibility (see [Tarball repackaging](#tarball-repackaging)).
+5. Projects with no releases yet still appear in the web UI with their metadata and a "No release published yet" warning, but are not visible to Unity Package Manager.
 
 ## Web UI
 
@@ -17,9 +18,11 @@ Fox includes a built-in web interface to browse available packages and configure
 
 - **Browse packages**: View all available packages in a clean, responsive interface
 - **Package details**: See Unity-specific metadata, dependencies, and version history
+- **GitLab links**: Each package card has a direct link to the source project on GitLab
 - **Unity configuration generator**: Automatically generates the complete `scopedRegistries` configuration for your Unity project's `Packages/manifest.json`
 - **Copy install commands**: One-click copy of dependency entries for Unity's `manifest.json`
 - **Copy Unity config**: One-click copy of the entire registry configuration block
+- **Dark/light theme**: Toggle between themes; preference is remembered in the browser
 - **Real-time updates**: Refresh button to fetch the latest packages from GitLab
 
 Access the UI at:
@@ -74,11 +77,12 @@ Fox resolves the NPM package name for each project in this order:
 2. The `name` field in the project's root `package.json` (standard for Unity packages)
 3. The GitLab project path as a fallback
 
-### Tarball assets
+### Tarball repackaging
 
-Fox looks for a `.tgz` release asset link in each GitLab release. For Unity Package Manager compatibility the tarball must be structured with a `package/` root directory — this is the standard output of `npm pack` run inside a Unity package folder.
+Fox always downloads the GitLab source archive for the tagged commit and repackages it on the fly into an NPM-compatible tarball. The repackager:
 
-If no `.tgz` asset is found Fox falls back to the GitLab source archive, but **Unity will likely reject it** because the archive root is the project folder, not `package/`. Upload a correctly structured `.tgz` as a release asset to avoid this.
+- Renames the archive root directory to `package/` (required by npm/Unity)
+- Patches the `version` field inside `package/package.json` to match the registry version, preventing mismatches when a developer commits a future version number before tagging
 
 ## Development
 
@@ -195,7 +199,11 @@ You can also pin a package to a specific version by adding it directly to the `d
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/-/all` | List all packages (used by Unity for package discovery) |
-| `GET` | `/:name` | Package manifest with all available versions |
+| `GET` | `/healthz` | Health check — returns `{"status":"ok"}` |
+| `GET` | `/` or `/ui` | Web UI (package browser) |
+| `GET` | `/.well-known/config` | Registry base URL and feature flags (used by the web UI) |
+| `POST` | `/-/reload` | Reload projects from the external projects file (no-op if not configured) |
+| `GET` | `/-/all` | All package manifests — used by Unity for package discovery |
+| `GET` | `/:name` | Full packument: all versions and metadata for a package |
 | `GET` | `/:name/:version` | Single version manifest |
-| `GET` | `/:name/-/:name-:version.tgz` | Tarball download (proxied from GitLab) |
+| `GET` | `/:name/-/:name-:version.tgz` | Tarball download (repackaged from GitLab source archive) |

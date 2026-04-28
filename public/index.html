@@ -4,36 +4,61 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fox Registry - Unity Package Browser</title>
+  <!-- Apply stored/preferred theme before first paint to avoid flash -->
+  <script>
+    if (localStorage.getItem('theme') === 'dark' ||
+        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Configure Tailwind after CDN load so darkMode:'class' is actually applied -->
+  <script>tailwind.config = { darkMode: 'class' };</script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
     [v-cloak] { display: none; }
+    html { transition: background-color 0.15s, color 0.15s; }
     .line-clamp-2 {
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
   <div id="app" v-cloak>
-    <header class="bg-white shadow-sm border-b">
+    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
           <div class="flex items-center">
-            <h1 class="text-2xl font-bold text-gray-900">🦊 Fox Registry</h1>
-            <p class="ml-4 text-gray-600">Unity Package Browser</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">🦊 Fox Registry</h1>
+            <p class="ml-4 text-gray-500 dark:text-gray-400 hidden sm:block">Unity Package Browser</p>
           </div>
-          <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-500" v-if="packages.length > 0">
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-400 dark:text-gray-500" v-if="packages.length > 0">
               {{ packages.length }} package{{ packages.length !== 1 ? 's' : '' }}
             </span>
+            <!-- Dark mode toggle -->
             <button
-              @click="fetchPackages"
+              @click="toggleDarkMode"
+              class="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              :title="darkMode ? 'Passer en thème clair' : 'Passer en thème sombre'">
+              <!-- Moon (visible in light mode) -->
+              <svg v-if="!darkMode" class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+              </svg>
+              <!-- Sun (visible in dark mode) -->
+              <svg v-else class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+              </svg>
+            </button>
+            <button
+              @click="fetchPackages(reloadSupported)"
               :disabled="loading"
               class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-              {{ loading ? 'Loading...' : 'Refresh' }}
+              {{ loading ? 'Loading...' : (reloadSupported ? 'Reload' : 'Refresh') }}
             </button>
           </div>
         </div>
@@ -46,7 +71,7 @@
         <div class="hidden lg:block w-80 flex-shrink-0">
           <div class="sticky top-8">
             <!-- Configure Unity Section -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
               <div class="flex items-start">
                 <div class="flex-shrink-0">
                   <svg class="h-4 w-4 text-blue-400 mt-1" fill="currentColor" viewBox="0 0 20 20">
@@ -54,12 +79,12 @@
                   </svg>
                 </div>
                 <div class="ml-2 flex-1 min-w-0">
-                  <h3 class="text-sm font-medium text-blue-900 mb-2">Configure Unity</h3>
-                  <p class="text-blue-700 mb-3 text-xs">Add this to your Unity project's <code class="bg-blue-100 px-1 py-0.5 rounded text-xs font-mono">manifest.json</code>:</p>
+                  <h3 class="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">Configure Unity</h3>
+                  <p class="text-blue-700 dark:text-blue-400 mb-3 text-xs">Add this to your Unity project's <code class="bg-blue-100 dark:bg-blue-800/50 px-1 py-0.5 rounded text-xs font-mono">manifest.json</code>:</p>
 
-                  <div class="bg-white border border-blue-300 rounded-md p-2 font-mono text-xs overflow-hidden">
+                  <div class="bg-white dark:bg-gray-700 border border-blue-300 dark:border-blue-700 rounded-md p-2 font-mono text-xs overflow-hidden">
                     <div class="max-h-48 overflow-y-auto overflow-x-hidden">
-                      <pre class="text-gray-800 whitespace-pre-wrap break-all">{{ unityConfig }}</pre>
+                      <pre class="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">{{ unityConfig }}</pre>
                     </div>
                   </div>
 
@@ -67,11 +92,11 @@
                     <button
                       @click="copyUnityConfig"
                       class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-medium transition-colors w-full mb-2">
-                      {{ copied ? 'Copied!' : 'Copy Config' }}
+                      {{ copied ? 'Copié !' : 'Copier la config' }}
                     </button>
-                    <div class="text-xs text-blue-600">
-                      <span class="font-medium">Registry:</span><br>
-                      <code class="bg-blue-100 px-1 py-0.5 rounded font-mono text-xs break-all">{{ registryUrl }}</code>
+                    <div class="text-xs text-blue-600 dark:text-blue-400">
+                      <span class="font-medium">Registry :</span><br>
+                      <code class="bg-blue-100 dark:bg-blue-800/50 px-1 py-0.5 rounded font-mono text-xs break-all">{{ registryUrl }}</code>
                     </div>
                   </div>
                 </div>
@@ -79,168 +104,178 @@
             </div>
 
             <!-- Package Statistics -->
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <h4 class="text-sm font-medium text-gray-900 mb-2">Statistics</h4>
-              <div class="space-y-1 text-xs text-gray-600">
+            <div class="bg-gray-100 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+              <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Statistiques</h4>
+              <div class="space-y-1 text-xs text-gray-600 dark:text-gray-400">
                 <div class="flex justify-between">
-                  <span>Packages:</span>
+                  <span>Packages :</span>
                   <span class="font-medium">{{ packages.length }}</span>
                 </div>
                 <div class="flex justify-between items-start">
-                  <span class="flex-shrink-0 mr-2">Status:</span>
-                  <span class="font-medium text-green-600" v-if="!loading && !error">Ready</span>
-                  <span class="font-medium text-yellow-600" v-else-if="loading">Loading</span>
-                  <span class="font-medium text-red-600" v-else>Error</span>
+                  <span class="flex-shrink-0 mr-2">Statut :</span>
+                  <span class="font-medium text-green-600 dark:text-green-400" v-if="!loading && !error">Prêt</span>
+                  <span class="font-medium text-yellow-600 dark:text-yellow-400" v-else-if="loading">Chargement</span>
+                  <span class="font-medium text-red-600 dark:text-red-400" v-else>Erreur</span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Mobile Unity Config Toggle -->
-        <div class="lg:hidden mb-6">
-          <button
-            @click="showMobileConfig = !showMobileConfig"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-between">
-            Configure Unity Package Manager
-            <svg class="h-4 w-4 transform transition-transform" :class="{ 'rotate-180': showMobileConfig }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          <div v-if="showMobileConfig" class="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p class="text-blue-700 mb-3 text-sm">Add this to your Unity project's <code class="bg-blue-100 px-1 py-0.5 rounded text-xs font-mono">manifest.json</code>:</p>
-
-            <div class="bg-white border border-blue-300 rounded-md p-3 font-mono text-xs overflow-hidden">
-              <div class="max-h-48 overflow-y-auto overflow-x-hidden">
-                <pre class="text-gray-800 whitespace-pre-wrap break-all">{{ unityConfig }}</pre>
-              </div>
-            </div>
-
-            <button
-              @click="copyUnityConfig"
-              class="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors w-full">
-              {{ copied ? 'Copied!' : 'Copy Config' }}
-            </button>
           </div>
         </div>
 
         <!-- Main Content -->
         <div class="flex-1 min-w-0">
-      <!-- Loading State -->
-      <div v-if="loading && packages.length === 0" class="flex flex-col items-center justify-center py-16">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p class="mt-4 text-gray-600">Loading packages...</p>
-      </div>
 
-      <!-- Error State -->
-      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-md p-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          <!-- Mobile Unity Config Toggle -->
+          <div class="lg:hidden mb-6">
+            <button
+              @click="showMobileConfig = !showMobileConfig"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-between">
+              Configurer Unity Package Manager
+              <svg class="h-4 w-4 transform transition-transform" :class="{ 'rotate-180': showMobileConfig }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <div v-if="showMobileConfig" class="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <p class="text-blue-700 dark:text-blue-400 mb-3 text-sm">Ajouter dans le <code class="bg-blue-100 dark:bg-blue-800/50 px-1 py-0.5 rounded text-xs font-mono">manifest.json</code> de votre projet :</p>
+              <div class="bg-white dark:bg-gray-700 border border-blue-300 dark:border-blue-700 rounded-md p-3 font-mono text-xs overflow-hidden">
+                <div class="max-h-48 overflow-y-auto overflow-x-hidden">
+                  <pre class="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">{{ unityConfig }}</pre>
+                </div>
+              </div>
+              <button
+                @click="copyUnityConfig"
+                class="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors w-full">
+                {{ copied ? 'Copié !' : 'Copier la config' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="loading && packages.length === 0" class="flex flex-col items-center justify-center py-16">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-4 text-gray-500 dark:text-gray-400">Chargement des packages…</p>
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+            <div class="flex">
+              <svg class="h-5 w-5 text-red-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              </svg>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800 dark:text-red-300">Erreur de chargement</h3>
+                <p class="mt-1 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else-if="!loading && packages.length === 0" class="text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+              <path d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A9.971 9.971 0 0124 24c4.004 0 7.625 2.371 9.287 6m-9.287-6c-4.004 0-7.625 2.371-9.287 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-          </div>
-          <div class="ml-3">
-            <h3 class="text-sm font-medium text-red-800">Error loading packages</h3>
-            <p class="mt-2 text-sm text-red-700">{{ error }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else-if="!loading && packages.length === 0" class="text-center py-16">
-        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-          <path d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A9.971 9.971 0 0124 24c4.004 0 7.625 2.371 9.287 6m-9.287-6c-4.004 0-7.625 2.371-9.287 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">No packages found</h3>
-        <p class="mt-1 text-sm text-gray-500">Check your Fox registry configuration.</p>
-      </div>
-
-      <!-- Package Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div
-          v-for="pkg in packages"
-          :key="pkg.name"
-          class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
-
-          <div class="p-6">
-            <!-- Package Header -->
-            <div class="flex items-start justify-between mb-4">
-              <div class="min-w-0 flex-1">
-                <h3 class="text-lg font-semibold text-gray-900 truncate">{{ pkg.name }}</h3>
-                <p class="text-sm text-gray-500 mt-1">v{{ pkg.latest }}</p>
-              </div>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                Unity
-              </span>
-            </div>
-
-            <!-- Description -->
-            <p v-if="pkg.description" class="text-sm text-gray-600 mb-4 line-clamp-2">
-              {{ pkg.description }}
-            </p>
-            <p v-else class="text-sm text-gray-400 italic mb-4">No description</p>
-
-            <!-- Unity Info -->
-            <div v-if="pkg.unity || pkg.unityRelease" class="mb-4 space-y-1">
-              <div v-if="pkg.unity" class="flex items-center text-xs text-gray-600">
-                <span class="font-medium">Unity:</span>
-                <span class="ml-1">{{ pkg.unity }}</span>
-              </div>
-              <div v-if="pkg.unityRelease" class="flex items-center text-xs text-gray-600">
-                <span class="font-medium">Unity Release:</span>
-                <span class="ml-1">{{ pkg.unityRelease }}</span>
-              </div>
-            </div>
-
-            <!-- Dependencies -->
-            <div v-if="pkg.dependencies && Object.keys(pkg.dependencies).length > 0" class="mb-4">
-              <h4 class="text-xs font-medium text-gray-700 mb-1">Dependencies:</h4>
-              <div class="flex flex-wrap gap-1">
-                <span
-                  v-for="(version, name) in pkg.dependencies"
-                  :key="name"
-                  class="inline-block text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                  {{ name }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Versions -->
-            <div class="flex items-center justify-between text-xs text-gray-500">
-              <span>{{ Object.keys(pkg.versions).length }} version{{ Object.keys(pkg.versions).length !== 1 ? 's' : '' }}</span>
-              <span v-if="pkg.time && pkg.time[pkg.latest]">
-                {{ formatDate(pkg.time[pkg.latest]) }}
-              </span>
-            </div>
+            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">Aucun package</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Vérifiez la configuration de Fox.</p>
           </div>
 
-          <!-- Actions -->
-          <div class="border-t border-gray-100 px-6 py-3 bg-gray-50 rounded-b-lg">
-            <div class="flex items-center justify-between">
-              <button
-                @click="copyInstallCommand(pkg.name)"
-                class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors">
-                Copy Install
-              </button>
-              <button
-                @click="toggleVersions(pkg.name)"
-                class="text-xs text-blue-600 hover:text-blue-800 font-medium">
-                {{ expandedPackages.has(pkg.name) ? 'Hide' : 'Show' }} Versions
-              </button>
-            </div>
+          <!-- Package Grid -->
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div
+              v-for="pkg in packages"
+              :key="pkg.name"
+              class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:shadow-gray-900 transition-shadow duration-200 flex flex-col h-60 overflow-hidden">
 
-            <!-- Version List (Expandable) -->
-            <div v-if="expandedPackages.has(pkg.name)" class="mt-3 pt-3 border-t border-gray-200">
-              <div class="space-y-1 max-h-32 overflow-y-auto">
-                <div
-                  v-for="(versionData, version) in pkg.versions"
-                  :key="version"
-                  class="flex items-center justify-between text-xs">
-                  <span class="font-mono text-gray-600">{{ version }}</span>
-                  <span v-if="pkg.time && pkg.time[version]" class="text-gray-400">
-                    {{ formatDate(pkg.time[version]) }}
+              <!-- Card body -->
+              <div class="p-4 flex flex-col flex-1 min-h-0">
+
+                <!-- Header: name + badge -->
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate leading-tight"
+                          :title="pkg.displayName || pkg.name">
+                        {{ pkg.displayName || pkg.name }}
+                      </h3>
+                      <a v-if="pkg._fox?.projectUrl"
+                         :href="pkg._fox.projectUrl"
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         class="flex-shrink-0 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                         :title="'Ouvrir dans GitLab : ' + pkg._fox.projectUrl">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                    <p class="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate mt-0.5">{{ pkg.name }}</p>
+                  </div>
+                  <span v-if="pkg._fox?.unreleased"
+                    class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                    Unreleased
+                  </span>
+                  <span v-else class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                    Unity
+                  </span>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-2">
+                  <p v-if="pkg.description"
+                     class="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed">{{ pkg.description }}</p>
+                  <p v-else class="text-xs text-gray-400 dark:text-gray-600 italic">Pas de description</p>
+                  <button
+                    v-if="pkg.description && (pkg.description.length > 80 || pkg.description.includes('\n'))"
+                    @click="openDescription(pkg)"
+                    class="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium mt-0.5">
+                    Voir plus…
+                  </button>
+                </div>
+
+                <!-- Spacer -->
+                <div class="flex-1"></div>
+
+                <!-- Metadata (released packages only) -->
+                <div v-else class="space-y-1">
+                  <div v-if="pkg.unity" class="text-xs text-gray-500 dark:text-gray-400">
+                    Unity {{ pkg.unity }}{{ pkg.unityRelease ? ' · ' + pkg.unityRelease : '' }}
+                  </div>
+                  <div v-if="pkg.dependencies && Object.keys(pkg.dependencies).length > 0"
+                       class="flex flex-wrap gap-1 overflow-hidden" style="max-height:20px">
+                    <span
+                      v-for="(ver, dep) in pkg.dependencies" :key="dep"
+                      class="inline-block text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-1.5 py-px rounded truncate max-w-[140px]"
+                      :title="dep">{{ dep }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action bar -->
+              <div class="border-t border-gray-100 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-700/40 rounded-b-lg flex-shrink-0">
+                <div class="flex items-center justify-between">
+                  <template v-if="!pkg._fox?.unreleased">
+                    <button
+                      @click="copyInstallCommand(pkg.name)"
+                      class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors">
+                      Copier
+                    </button>
+                    <div class="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                      <span class="font-mono">v{{ pkg.latest }}</span>
+                      <span v-if="pkg.time && pkg.time[pkg.latest]">
+                        · {{ formatDate(pkg.time[pkg.latest]) }}
+                      </span>
+                      <button
+                        @click="openVersions(pkg)"
+                        class="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
+                        {{ Object.keys(pkg.versions).length }} version{{ Object.keys(pkg.versions).length !== 1 ? 's' : '' }}
+                      </button>
+                    </div>
+                  </template>
+                  <span v-else class="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                    <svg class="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    No release published yet
                   </span>
                 </div>
               </div>
@@ -248,16 +283,82 @@
           </div>
         </div>
       </div>
+    </main>
+
+    <!-- Description Modal -->
+    <div
+      v-if="descriptionModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="closeDescription"
+      @keydown.esc.window="closeDescription">
+      <div class="absolute inset-0 bg-black/50"></div>
+      <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[80vh]">
+        <div class="flex items-start justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+          <div class="min-w-0 pr-4">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+              {{ descriptionModal.displayName || descriptionModal.name }}
+            </h3>
+            <p class="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">{{ descriptionModal.name }} · v{{ descriptionModal.latest }}</p>
+          </div>
+          <button @click="closeDescription" class="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="p-5 overflow-y-auto">
+          <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{{ descriptionModal.description }}</p>
         </div>
       </div>
-    </main>
+    </div>
+
+    <!-- Versions Modal -->
+    <div
+      v-if="versionsModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="closeVersions"
+      @keydown.esc.window="closeVersions">
+      <div class="absolute inset-0 bg-black/50"></div>
+      <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
+        <div class="flex items-start justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+          <div class="min-w-0 pr-4">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+              {{ versionsModal.displayName || versionsModal.name }}
+            </h3>
+            <p class="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">{{ versionsModal.name }}</p>
+          </div>
+          <button @click="closeVersions" class="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+          <div
+            v-for="(versionData, version) in versionsModal.versions"
+            :key="version"
+            class="flex items-center justify-between px-5 py-2.5">
+            <span class="font-mono text-sm text-gray-800 dark:text-gray-200 font-medium">
+              {{ version }}
+              <span v-if="version === versionsModal.latest"
+                class="ml-2 text-[10px] font-sans bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded-full">
+                latest
+              </span>
+            </span>
+            <span v-if="versionsModal.time && versionsModal.time[version]"
+              class="text-xs text-gray-400 dark:text-gray-500">
+              {{ formatDate(versionsModal.time[version]) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Toast Notification -->
     <div
       v-if="showToast"
-      class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md shadow-lg transition-opacity duration-300"
-      :class="{ 'opacity-0': !showToast }">
-      Install command copied to clipboard!
+      class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md shadow-lg">
+      Commande copiée !
     </div>
   </div>
 
@@ -269,27 +370,65 @@
         const packages = ref([]);
         const loading = ref(false);
         const error = ref(null);
-        const expandedPackages = ref(new Set());
         const showToast = ref(false);
         const registryUrl = ref('');
         const copied = ref(false);
         const showMobileConfig = ref(false);
+        const reloadSupported = ref(false);
+        const descriptionModal = ref(null);
+        const versionsModal = ref(null);
+        const darkMode = ref(document.documentElement.classList.contains('dark'));
+
+        const toggleDarkMode = () => {
+          darkMode.value = !darkMode.value;
+          document.documentElement.classList.toggle('dark', darkMode.value);
+          localStorage.setItem('theme', darkMode.value ? 'dark' : 'light');
+        };
+
+        const computeScopes = (names) => {
+          if (names.length === 0) return [];
+          const segs = names.map(n => n.split('.'));
+          const minLen = Math.min(...segs.map(s => s.length));
+          let common = 0;
+          for (let i = 0; i < minLen; i++) {
+            if (segs.every(s => s[i] === segs[0][i])) common = i + 1;
+            else break;
+          }
+          return common >= 2 ? [segs[0].slice(0, common).join('.')] : names;
+        };
 
         const unityConfig = computed(() => {
           if (!registryUrl.value || packages.value.length === 0) return '';
-
-          const packageScopes = packages.value.map(pkg => `    "${pkg.name}"`).join(',\n');
-
+          const names = packages.value.map(pkg => pkg.name);
+          const scopes = computeScopes(names).map(s => `        "${s}"`).join(',\n');
           return `{
   "scopedRegistries": [
     {
       "name": "Fox Registry",
       "url": "${registryUrl.value}",
-      "scopes": [ ... ]
+      "scopes": [
+${scopes}
+      ]
     }
   ]
 }`;
         });
+
+        const copyToClipboard = async (text) => {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return;
+          }
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (!ok) throw new Error('Copy failed');
+        };
 
         const fetchConfig = async () => {
           try {
@@ -297,74 +436,58 @@
             if (response.ok) {
               const config = await response.json();
               registryUrl.value = config.registry?.baseUrl || window.location.origin;
+              reloadSupported.value = config.registry?.reloadSupported ?? false;
             } else {
-              // Fallback to current origin if config endpoint doesn't exist
               registryUrl.value = window.location.origin;
             }
-          } catch (err) {
+          } catch {
             registryUrl.value = window.location.origin;
           }
         };
 
-        const fetchPackages = async () => {
+        const fetchPackages = async (reload = false) => {
           loading.value = true;
           error.value = null;
-
           try {
+            if (reload) await fetch('/-/reload', { method: 'POST' });
             const response = await fetch('/-/all');
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             const data = await response.json();
-            packages.value = Object.values(data).map(pkg => ({
-              ...pkg,
-              latest: pkg['dist-tags']?.latest || 'unknown'
-            }));
+            packages.value = Object.values(data)
+              .map(pkg => ({ ...pkg, latest: pkg['dist-tags']?.latest || 'unknown' }))
+              .sort((a, b) => a.name.localeCompare(b.name));
           } catch (err) {
             error.value = err.message;
-            console.error('Failed to fetch packages:', err);
           } finally {
             loading.value = false;
           }
         };
 
         const formatDate = (dateString) => {
-          try {
-            return new Date(dateString).toLocaleDateString();
-          } catch {
-            return dateString;
-          }
+          try { return new Date(dateString).toLocaleDateString('fr-FR'); }
+          catch { return dateString; }
         };
 
         const copyInstallCommand = async (packageName) => {
-          const command = `"${packageName}": "latest"`;
-          try {
-            await navigator.clipboard.writeText(command);
-            showToast.value = true;
-            setTimeout(() => showToast.value = false, 2000);
-          } catch (err) {
-            console.error('Failed to copy to clipboard:', err);
-          }
+          try { await copyToClipboard(`"${packageName}": "latest"`); }
+          catch { /* silent */ }
+          showToast.value = true;
+          setTimeout(() => showToast.value = false, 2000);
         };
 
         const copyUnityConfig = async () => {
           try {
-            await navigator.clipboard.writeText(unityConfig.value);
+            await copyToClipboard(unityConfig.value);
             copied.value = true;
             setTimeout(() => copied.value = false, 2000);
-          } catch (err) {
-            console.error('Failed to copy to clipboard:', err);
-          }
+          } catch { /* silent */ }
         };
 
-        const toggleVersions = (packageName) => {
-          if (expandedPackages.value.has(packageName)) {
-            expandedPackages.value.delete(packageName);
-          } else {
-            expandedPackages.value.add(packageName);
-          }
-        };
+        const openDescription = (pkg) => { descriptionModal.value = pkg; };
+        const closeDescription = () => { descriptionModal.value = null; };
+
+        const openVersions = (pkg) => { versionsModal.value = pkg; };
+        const closeVersions = () => { versionsModal.value = null; };
 
         onMounted(() => {
           fetchConfig();
@@ -372,20 +495,12 @@
         });
 
         return {
-          packages,
-          loading,
-          error,
-          expandedPackages,
-          showToast,
-          registryUrl,
-          unityConfig,
-          copied,
-          showMobileConfig,
-          fetchPackages,
-          formatDate,
-          copyInstallCommand,
-          copyUnityConfig,
-          toggleVersions
+          packages, loading, error, showToast,
+          registryUrl, unityConfig, copied, showMobileConfig, reloadSupported,
+          darkMode, toggleDarkMode,
+          fetchPackages, formatDate, copyInstallCommand, copyUnityConfig,
+          descriptionModal, openDescription, closeDescription,
+          versionsModal, openVersions, closeVersions,
         };
       }
     }).mount('#app');
