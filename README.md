@@ -12,6 +12,8 @@ Fox maps a set of configured GitLab projects to NPM packages. For each project i
 4. Tarball downloads are served from the GitLab source archive for the tagged commit, repackaged on the fly for Unity compatibility (see [Tarball repackaging](#tarball-repackaging)).
 5. Projects with no releases yet still appear in the web UI with their metadata and a "No release published yet" warning, but are not visible to Unity Package Manager.
 
+> **Note:** Fox reads GitLab **Releases** (Deploy → Releases in the GitLab UI), not git tags. Pushing a tag alone is not enough — you must create a release from that tag for the package to stop showing as unreleased.
+
 ## Web UI
 
 Fox includes a built-in web interface to browse available packages and configure Unity Package Manager. Visit the registry URL in your browser to see all packages with their versions, descriptions, Unity compatibility info, and dependencies.
@@ -62,6 +64,10 @@ cp fox.config.example.json fox.config.json
     {
       "id": "mygroup/my-unity-package",     // or namespace/path
       "nameOverride": "com.mycompany.mypackage"  // optional: override the package name
+    },
+    {
+      "id": "mygroup/monorepo",
+      "packageRoot": "Packages/com.mycompany.mypackage"  // optional: subfolder containing the package (default: repo root)
     }
   ]
 }
@@ -74,7 +80,7 @@ The config file path can be overridden with the `FOX_CONFIG` environment variabl
 Fox resolves the NPM package name for each project in this order:
 
 1. `nameOverride` in the config, if set
-2. The `name` field in the project's root `package.json` (standard for Unity packages)
+2. The `name` field in the project's `package.json` — at the repo root by default, or under `packageRoot` if set (useful for monorepos where the Unity package lives in a subfolder, e.g. `Packages/com.mycompany.mypackage/`)
 3. The GitLab project path as a fallback
 
 ### Tarball repackaging
@@ -82,6 +88,7 @@ Fox resolves the NPM package name for each project in this order:
 Fox always downloads the GitLab source archive for the tagged commit and repackages it on the fly into an NPM-compatible tarball. The repackager:
 
 - Renames the archive root directory to `package/` (required by npm/Unity)
+- If `packageRoot` is set, keeps only files under that subfolder and makes it the new `package/` root — the rest of the monorepo is excluded from the tarball
 - Patches the `version` field inside `package/package.json` to match the registry version, preventing mismatches when a developer commits a future version number before tagging
 
 ## Development

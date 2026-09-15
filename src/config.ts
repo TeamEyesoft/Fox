@@ -6,6 +6,8 @@ export interface ProjectConfig {
   id: number | string;
   /** Override the package name; otherwise read from the project's root package.json */
   nameOverride?: string;
+  /** Subdirectory containing the package, e.g. "Packages/com.company.pkg". When set, package.json is read from "<packageRoot>/package.json" and only that subfolder is packaged into the tarball. Defaults to the repo root. */
+  packageRoot?: string;
 }
 
 export interface FoxConfig {

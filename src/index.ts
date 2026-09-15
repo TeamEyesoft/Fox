@@ -124,6 +124,7 @@ const app = new Elysia()
         source.projectId,
         source.tagName,
         source.version,
+        source.packageRoot,
       );
 
       if (!upstream.ok) {
