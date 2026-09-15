@@ -91,15 +91,17 @@ export class GitLabClient {
   async getPackageJson(
     id: number | string,
     ref: string,
+    path = "package.json",
   ): Promise<Record<string, unknown> | null> {
     const encoded = encodeURIComponent(String(id));
-    const cacheKey = `gl:pkgjson:${id}:${ref}`;
+    const encodedPath = encodeURIComponent(path);
+    const cacheKey = `gl:pkgjson:${id}:${ref}:${path}`;
     try {
       return await this.cache.getOrSet(
         cacheKey,
         async () => {
           const url = `${this.apiUrl(
-            `/projects/${encoded}/repository/files/package.json/raw`,
+            `/projects/${encoded}/repository/files/${encodedPath}/raw`,
           )}?ref=${encodeURIComponent(ref)}`;
           const res = await this.rawFetch(url);
           if (!res.ok) return null;
@@ -116,6 +118,7 @@ export class GitLabClient {
     id: number | string,
     tagName: string,
     version: string,
+    packageRoot?: string,
   ): Promise<Response> {
     // Always use the source archive so the tarball is always at the exact
     // tagged commit. We also patch package.json to the registry version because
@@ -130,11 +133,13 @@ export class GitLabClient {
     logger.info("Repackaging source archive for Unity compatibility", {
       projectId: id,
       tag: tagName,
+      packageRoot,
     });
 
     const repackaged = await repackSourceArchive(
       Buffer.from(await upstream.arrayBuffer()),
       version,
+      packageRoot,
     );
 
     return new Response(repackaged, {

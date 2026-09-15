@@ -124,6 +124,7 @@ const app = new Elysia()
         source.projectId,
         source.tagName,
         source.version,
+        source.packageRoot,
       );
 
       if (!upstream.ok) {
@@ -156,7 +157,23 @@ const app = new Elysia()
     }
   })
 
-  .listen(config.port);
+  .compile();
+
+// Unity writes the scoped registry URL from manifest.json as-is when building
+// request URLs, so a trailing slash there (e.g. "http://host:3000/") produces
+// double slashes here (e.g. "//fr.eyesoft.builder"). Collapse repeated
+// slashes before routing so a misconfigured client doesn't 404.
+const server = Bun.serve({
+  port: config.port,
+  fetch(request) {
+    const url = new URL(request.url);
+    if (/\/{2,}/.test(url.pathname)) {
+      url.pathname = url.pathname.replace(/\/{2,}/g, "/");
+      request = new Request(url, request);
+    }
+    return app.handle(request);
+  },
+});
 
 logger.info("Fox registry started", {
   url: config.registry.baseUrl,
@@ -168,7 +185,7 @@ logger.info("Fox registry started", {
 const shutdown = (signal: string) => {
   logger.info("Shutting down", { signal });
   cache.stop();
-  app.stop();
+  server.stop();
   process.exit(0);
 };
 

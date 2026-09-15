@@ -83,23 +83,72 @@ export class Registry {
     }
   }
 
+  /** Path to package.json for a project, honoring its optional packageRoot. */
+  private packageJsonPath(proj: ProjectConfig): string | undefined {
+    return proj.packageRoot
+      ? `${proj.packageRoot.replace(/\/+$/, "")}/package.json`
+      : undefined;
+  }
+
   private async resolvePackageName(proj: ProjectConfig): Promise<string> {
     if (proj.nameOverride) return proj.nameOverride;
 
-    const pkgJson = await this.gitlab.getPackageJson(proj.id, "HEAD");
+    const pkgJson = await this.gitlab.getPackageJson(
+      proj.id,
+      "HEAD",
+      this.packageJsonPath(proj),
+    );
     if (typeof pkgJson?.name === "string") return pkgJson.name;
 
     const project = await this.gitlab.getProject(proj.id);
     return project.path;
   }
 
-  private buildVersionManifest(
+  /**
+   * Unity Package Manager crashes if a packument's dist.integrity is absent
+   * for a version it decides to install — it doesn't tolerate the "compute on
+   * first download" laziness real npm registries don't need (they always have
+   * it precomputed at publish time). So we compute it here, before the
+   * manifest is ever handed out, instead of waiting for a tarball request.
+   */
+  private async ensureIntegrity(
+    name: string,
+    version: string,
+    proj: ProjectConfig,
+    tagName: string,
+  ): Promise<void> {
+    const key = `${name}@${version}`;
+    if (this.integrityStore.has(key)) return;
+
+    const upstream = await this.gitlab.proxyTarball(
+      proj.id,
+      tagName,
+      version,
+      proj.packageRoot,
+    );
+    if (!upstream.ok) return;
+
+    const buffer = await upstream.arrayBuffer();
+    const [sha512Buffer, sha1Buffer] = await Promise.all([
+      crypto.subtle.digest("SHA-512", buffer),
+      crypto.subtle.digest("SHA-1", buffer),
+    ]);
+    this.integrityStore.set(
+      key,
+      `sha512-${Buffer.from(sha512Buffer).toString("base64")}`,
+    );
+    this.shasumStore.set(key, Buffer.from(sha1Buffer).toString("hex"));
+  }
+
+  private async buildVersionManifest(
     name: string,
     release: GitLabRelease,
     pkgJson: Record<string, unknown> | null,
-  ): NpmVersionManifest {
+    proj: ProjectConfig,
+  ): Promise<NpmVersionManifest> {
     const version = normalizeVersion(release.tag_name);
     const tarball = `${this.config.registry.baseUrl}/${name}/-/${name}-${version}.tgz`;
+    await this.ensureIntegrity(name, version, proj, release.tag_name);
     const integrity = this.integrityStore.get(`${name}@${version}`);
     const shasum = this.shasumStore.get(`${name}@${version}`);
 
@@ -155,7 +204,11 @@ export class Registry {
     const projectUrl = `${this.config.gitlab.baseUrl}/${project.path_with_namespace}`;
 
     if (releases.length === 0) {
-      const pkgJson = await this.gitlab.getPackageJson(proj.id, "HEAD");
+      const pkgJson = await this.gitlab.getPackageJson(
+        proj.id,
+        "HEAD",
+        this.packageJsonPath(proj),
+      );
       return {
         name,
         displayName:
@@ -181,8 +234,14 @@ export class Registry {
         const pkgJson = await this.gitlab.getPackageJson(
           proj.id,
           release.tag_name,
+          this.packageJsonPath(proj),
         );
-        versions[version] = this.buildVersionManifest(name, release, pkgJson);
+        versions[version] = await this.buildVersionManifest(
+          name,
+          release,
+          pkgJson,
+          proj,
+        );
         time[version] = release.released_at ?? release.created_at;
       }),
     );
@@ -222,8 +281,12 @@ export class Registry {
     );
     if (!release) return null;
 
-    const pkgJson = await this.gitlab.getPackageJson(proj.id, release.tag_name);
-    return this.buildVersionManifest(name, release, pkgJson);
+    const pkgJson = await this.gitlab.getPackageJson(
+      proj.id,
+      release.tag_name,
+      this.packageJsonPath(proj),
+    );
+    return this.buildVersionManifest(name, release, pkgJson, proj);
   }
 
   async getTarballSource(
@@ -233,6 +296,7 @@ export class Registry {
     projectId: number | string;
     tagName: string;
     version: string;
+    packageRoot?: string;
   } | null> {
     await this.ensureInitialized();
     const proj = this.projectByName.get(name);
@@ -244,7 +308,12 @@ export class Registry {
     );
     if (!release) return null;
 
-    return { projectId: proj.id, tagName: release.tag_name, version };
+    return {
+      projectId: proj.id,
+      tagName: release.tag_name,
+      version,
+      packageRoot: proj.packageRoot,
+    };
   }
 
   async getAllPackuments(): Promise<Record<string, NpmPackument>> {
